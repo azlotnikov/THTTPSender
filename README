@@ -1,7 +1,7 @@
-THTTPSender
+THTTPSender - легкая замена idHTTP + idCookieManager + TIdSSLIOHandlerSocketOpenSSL
 
 + GET, POST, PUT Запросы
-+ HTTPS без сторонних биллиотек
++ HTTPS без сторонних библиотек
 + Автоматические редиректы (опционально)
 + Поддержка Cookies (опционально) - удобное хранение, управление, редактирование.
 + Proxy - все типы
