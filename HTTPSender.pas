@@ -2,6 +2,8 @@
 
 interface
 
+// (c) Z.Razor | zt.am | 2012
+
 uses Windows, WinInet, {Classes,} Sysutils;
 
 type
@@ -9,8 +11,8 @@ type
     FDomain: String;
     FName: String;
     FValue: String;
-    FExpires: TDateTime;
-    FHttpOnly: Boolean;
+    FExpires: String;
+    FPath: String;
   end;
 
   THTTPCookieArray = array of THTTPCookie;
@@ -39,6 +41,7 @@ type
     ContentLength: Integer;
     ContentEncoding: String;
     Location: String;
+    Expires: String;
   end;
 
   THTTPHeaders = record
@@ -48,45 +51,50 @@ type
     AcceptEncoding: String;
     ExtraHeaders: string;
     Refferer: string;
+    UserAgent: string;
+  end;
+
+  THTTPBasicAuth = record
+    Username: string;
+    Password: string;
   end;
 
 type
   THTTPSender = class // (TComponent)
   private
-    RUserAgent: string;
     RResponse: THTTPResponse;
     RResponseText: AnsiString;
     RAllowCookies: Boolean;
-    RHandleRedirects: Boolean;
+    RAutoRedirects: Boolean;
     RConnectTimeout: Integer;
     RReadTimeout: Integer;
     RSendTimeout: Integer;
-    RMaxRedirectCount: Integer;
     RProxy: String;
     RProxyBypass: String;
     function URLEncode(const URL: string): string;
     function GetWinInetError(ErrorCode: Cardinal): string;
     function GetQueryInfo(hRequest: Pointer; Flag: Integer): String;
     function GetHeaders: PWideChar;
-    procedure URLExecute(HTTPS: Boolean; RedirectNum: Integer; const ServerName, Resource: string; Post: Boolean;
+    procedure ProcessCookies(Data: string);
+    procedure URLExecute(HTTPS: Boolean; const ServerName, Resource: string; Method: String;
       const PostData: AnsiString = '');
     procedure ParseURL(const lpszUrl: string; var Host, Resource: string);
   public
     Cookies: THTTPCookieCollection;
     Headers: THTTPHeaders;
+    BasicAuth: THTTPBasicAuth;
     property Response: THTTPResponse read RResponse;
     property ResponseText: AnsiString read RResponseText;
     function Get(URL: String): AnsiString;
     function Post(URL: String; PostData: AnsiString): AnsiString;
+    function Put(URL: String): AnsiString;
     procedure Free;
     constructor Create; // (AOwner:TComponent); override;
   published
-    property UserAgent: string read RUserAgent write RUserAgent;
     property Proxy: string read RProxy write RProxy;
     property ProxyBypass: string read RProxyBypass write RProxyBypass;
     property AllowCookies: Boolean read RAllowCookies write RAllowCookies;
-    property HandleRedirects: Boolean read RHandleRedirects write RHandleRedirects;
-    property MaxRedirectCount: Integer read RMaxRedirectCount write RMaxRedirectCount;
+    property AutoRedirects: Boolean read RAutoRedirects write RAutoRedirects;
     property ConnectTimeout: Integer read RConnectTimeout write RConnectTimeout;
     property ReadTimeout: Integer read RReadTimeout write RReadTimeout;
     property SendTimeout: Integer read RSendTimeout write RSendTimeout;
@@ -184,8 +192,8 @@ begin
   end;
 end;
 
-procedure THTTPSender.URLExecute(HTTPS: Boolean; RedirectNum: Integer; const ServerName, Resource: string;
-  Post: Boolean; const PostData: AnsiString = '');
+procedure THTTPSender.URLExecute(HTTPS: Boolean; const ServerName, Resource: string; Method: String;
+  const PostData: AnsiString = '');
 const
   C_PROXYCONNECTION = 'Proxy-Connection: Keep-Alive'#10#13;
 var
@@ -200,7 +208,6 @@ var
   ConnectPort: INTERNET_PORT;
   OpenTypeFlags: DWORD;
   OpenRequestFlags: DWORD;
-  RequestType: PWideChar;
   PostDataPointer: Pointer;
   PostDataLength: DWORD;
   Buffer: array [0 .. 1024] of AnsiChar;
@@ -208,6 +215,7 @@ var
   function ExtractHeaders: Boolean;
   var
     lpdwReserved: DWORD;
+
   begin
     Result := true;
     with RResponse do begin
@@ -224,10 +232,16 @@ var
         lpdwBufferLength, lpdwReserved) then ContentLength := 0;
       SetLength(ContentEncoding, 1024);
       lpdwBufferLength := Length(ContentEncoding);
-      HttpQueryInfo(hRequest, HTTP_QUERY_CONTENT_ENCODING, @ContentEncoding[1], lpdwBufferLength, lpdwReserved);
+      if not HttpQueryInfo(hRequest, HTTP_QUERY_CONTENT_ENCODING, @ContentEncoding[1], lpdwBufferLength, lpdwReserved)
+      then ContentEncoding := '';
       SetLength(Location, 1024);
       lpdwBufferLength := Length(Location);
-      HttpQueryInfo(hRequest, HTTP_QUERY_LOCATION, @Location[1], lpdwBufferLength, lpdwReserved);
+      if not HttpQueryInfo(hRequest, HTTP_QUERY_LOCATION, @Location[1], lpdwBufferLength, lpdwReserved) then
+          Location := '';
+      SetLength(Expires, 1024);
+      lpdwBufferLength := Length(Expires);
+      if not HttpQueryInfo(hRequest, HTTP_QUERY_EXPIRES, @Expires[1], lpdwBufferLength, lpdwReserved) then
+          Expires := '';
     end;
   end;
 
@@ -237,13 +251,14 @@ begin
     StatusText := '';
     RawHeaders := '';
     ContentLength := 0;
+    Expires := '';
   end;
   RResponseText := '';
 
   if RProxy <> '' then OpenTypeFlags := INTERNET_OPEN_TYPE_PROXY
   else OpenTypeFlags := INTERNET_OPEN_TYPE_PRECONFIG;
 
-  hInet := InternetOpen(PChar(RUserAgent), OpenTypeFlags, PChar(RProxy), PChar(RProxyBypass), 0);
+  hInet := InternetOpen(PChar(Headers.UserAgent), OpenTypeFlags, PChar(RProxy), PChar(RProxyBypass), 0);
 
   InternetSetOption(hInet, INTERNET_OPTION_CONNECT_TIMEOUT, @RConnectTimeout, SizeOf(RConnectTimeout));
   InternetSetOption(hInet, INTERNET_OPTION_RECEIVE_TIMEOUT, @RReadTimeout, SizeOf(RReadTimeout));
@@ -257,7 +272,8 @@ begin
   try
     if HTTPS then ConnectPort := INTERNET_DEFAULT_HTTPS_PORT
     else ConnectPort := INTERNET_DEFAULT_HTTP_PORT;
-    hConnect := InternetConnect(hInet, PChar(ServerName), ConnectPort, nil, nil, INTERNET_SERVICE_HTTP, 0, 0);
+    hConnect := InternetConnect(hInet, PChar(ServerName), ConnectPort, PChar(BasicAuth.Username),
+      PChar(BasicAuth.Password), INTERNET_SERVICE_HTTP, 0, 0);
     if hConnect = nil then begin
       ErrorCode := GetLastError;
       raise Exception.Create(Format('InternetConnect Error %d Description %s',
@@ -267,9 +283,9 @@ begin
     try
       if HTTPS then OpenRequestFlags := INTERNET_FLAG_SECURE
       else OpenRequestFlags := INTERNET_FLAG_RELOAD;
-      if Post then RequestType := 'POST'
-      else RequestType := 'GET';
-      hRequest := HttpOpenRequest(hConnect, RequestType, PChar(Resource), HTTP_VERSION, PChar(Headers.Refferer), nil,
+      if not RAutoRedirects then OpenRequestFlags := OpenRequestFlags or INTERNET_FLAG_NO_AUTO_REDIRECT;
+      if not RAllowCookies then OpenRequestFlags := OpenRequestFlags or INTERNET_FLAG_NO_COOKIES;
+      hRequest := HttpOpenRequest(hConnect, PChar(Method), PChar(Resource), HTTP_VERSION, PChar(Headers.Refferer), nil,
         OpenRequestFlags, 0);
       if hRequest = nil then begin
         ErrorCode := GetLastError;
@@ -281,7 +297,7 @@ begin
           HttpAddRequestHeaders(hRequest, C_PROXYCONNECTION, Length(C_PROXYCONNECTION), HTTP_ADDREQ_FLAG_ADD);
 
       try
-        if Post then begin
+        if Method = 'POST' then begin
           PostDataPointer := @PostData[1];
           PostDataLength := Length(PostData);
         end else begin
@@ -296,6 +312,7 @@ begin
         end;
 
         RResponse.RawHeaders := GetQueryInfo(hRequest, HTTP_QUERY_RAW_HEADERS_CRLF);
+        if not RAllowCookies then ProcessCookies(RResponse.RawHeaders);
 
         if not ExtractHeaders then begin
           ErrorCode := GetLastError;
@@ -330,11 +347,9 @@ constructor THTTPSender.Create; // (AOwner:TComponent);
 begin
   // inherited;
   Cookies := THTTPCookieCollection.Create;
-  RUserAgent := 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)';
   RReadTimeout := 60000;
   RConnectTimeout := 60000;
   RSendTimeout := 60000;
-  MaxRedirectCount := 10;
   RProxy := '';
   RProxyBypass := '';
   with Headers do begin
@@ -344,6 +359,7 @@ begin
     AcceptEncoding := '';
     ExtraHeaders := '';
     Refferer := '';
+    UserAgent := 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)';
   end;
 end;
 
@@ -359,7 +375,7 @@ var
 begin
   Result := '';
   ParseURL(URL, Host, Resource);
-  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), 0, Host, Resource, false)
+  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, 'GET')
   else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
   Result := RResponseText;
 end;
@@ -382,7 +398,52 @@ var
 begin
   Result := '';
   ParseURL(URL, Host, Resource);
-  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), 0, Host, Resource, true, PostData)
+  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, 'POST', PostData)
+  else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
+  Result := RResponseText;
+end;
+
+function Pars(const source, left, right: string): string;
+var
+  r, l: Integer;
+begin
+  l := Pos(left, source);
+  r := Pos(right, (Copy(source, l + Length(left), Length(source) - l - Length(left)))) + l;
+  if l = r then exit('');
+  Result := Copy(source, l + Length(left), r - l - 1);
+end;
+
+procedure THTTPSender.ProcessCookies(Data: string);
+const
+  SetCookie = 'Set-Cookie:';
+
+  function GetCookie(s: string): THTTPCookie;
+  var
+    t: string;
+  begin
+    with Result do begin
+      FName := Copy(s, 1, Pos('=', s) - 1);
+      FValue := Pars(s, '=', ';');
+      FPath := Pars(s, 'path=', ';');
+      FExpires := Pars(s, 'expires=', ';');
+      FDomain := Pars(s, 'domain=', ';');
+    end;
+  end;
+
+begin
+  while Pos(SetCookie, Data) > 0 do begin
+    Cookies.Add(GetCookie(Pars(Data, SetCookie, #10#13)), true);
+    Delete(Data, Pos(SetCookie, Data), Length(SetCookie));
+  end;
+end;
+
+function THTTPSender.Put(URL: String): AnsiString;
+var
+  Host, Resource: string;
+begin
+  Result := '';
+  ParseURL(URL, Host, Resource);
+  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, 'PUT')
   else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
   Result := RResponseText;
 end;
@@ -390,8 +451,17 @@ end;
 { THTTPCookieCollection }
 
 function THTTPCookieCollection.Add(Cookie: THTTPCookie; ReplaceIfExists: Boolean): Integer;
+var
+  i: Integer;
 begin
   Result := -1;
+  for i := 0 to High(Cookies) do
+    if (Cookies[i].FDomain = Cookie.FDomain) and (Cookies[i].FName = Cookie.FName) then begin
+      Cookies[i] := Cookie;
+      exit(i);
+    end;
+  SetLength(Cookies, Length(Cookies) + 1);
+  Cookies[high(Cookies)] := Cookie;
 end;
 
 function THTTPCookieCollection.AllItems: string;

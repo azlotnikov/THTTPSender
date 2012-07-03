@@ -1,0 +1,11 @@
+THTTPSender
+
++ GET, POST, PUT Запросы
++ HTTPS без сторонних биллиотек
++ Автоматические редиректы (опционально)
++ Поддержка Cookies (опционально) - удобное хранение, управление, редактирование.
++ Proxy - все типы
++ Настройка Headers - UserAgnet, Refferer, Accept-Encoding и т д + добавление собственных ExtraHeaders
++ Вся информация о Response - RawHeaders (все заголовки), StatusCode,StatusText,Location,CurrentEncoding и т д
++ Basic Auth
++ Read, Connect, Send Timeouts

@@ -32,15 +32,21 @@ var
   a: TStringStream;
 begin
   HTTP := THttpSender.Create;
-  HTTP.Get('http://zhyk.ru/');
-  //showmessage(HTTP.response.RawHeaders);
-  //showmessage(HTTP.response.Location);
- mmo.Text:=http.responsetext;
+  // HTTP.Proxy := '38.80.72.31:8080';
+  HTTP.AllowCookies := true;
+  HTTP.AutoRedirects := true;
+  HTTP.Get('http://spaceengine.ucoz.org/forum');
+
+  // showmessage(HTTP.response.RawHeaders);
+  // showmessage(HTTP.response.Location);
+  mmo.Text := HTTP.Response.RawHeaders;
+  ShowMessage(HTTP.Cookies.Items[0].FDomain);
 end;
 
 procedure TForm3.FormCreate(Sender: TObject);
 begin
   // http.CookieManager.CookieCollection
+
 end;
 
 end.
