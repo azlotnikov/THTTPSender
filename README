@@ -4,8 +4,10 @@ THTTPSender - легкая замена idHTTP + idCookieManager + TIdSSLIOHandlerSocketOpen
 + HTTPS без сторонних библиотек
 + Автоматические редиректы (опционально)
 + Поддержка Cookies (опционально) - удобное хранение, управление, редактирование.
++ Взможность использовать IE Cookies.
 + Proxy - все типы
 + Настройка Headers - UserAgnet, Refferer, Accept-Encoding и т д + добавление собственных ExtraHeaders
 + Вся информация о Response - RawHeaders (все заголовки), StatusCode,StatusText,Location,CurrentEncoding и т д
 + Basic Auth
 + Read, Connect, Send Timeouts
++ События OnWork, OnWorkBegin, OnWorkEnd аналогичные таким же событиям в IdHTTP
