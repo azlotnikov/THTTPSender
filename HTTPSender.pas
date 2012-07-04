@@ -47,14 +47,23 @@ type
     Expires: String;
   end;
 
-  THTTPHeaders = record
-    ContentType: String;
-    Accept: String;
-    AcceptLanguage: String;
-    AcceptEncoding: String;
-    ExtraHeaders: string;
-    Refferer: string;
-    UserAgent: string;
+  THTTPHeaders = class(TPersistent)
+  private
+    RContentType: String;
+    RAccept: String;
+    RAcceptLanguage: String;
+    RAcceptEncoding: String;
+    RExtraHeaders: string;
+    RRefferer: string;
+    RUserAgent: string;
+  published
+    property ContentType: String read RContentType write RContentType;
+    property Accept: String read RAccept write RAccept;
+    property AcceptLanguage: String read RAcceptLanguage write RAcceptLanguage;
+    property AcceptEncoding: String read RAcceptEncoding write RAcceptEncoding;
+    property ExtraHeaders: String read RExtraHeaders write RExtraHeaders;
+    property Refferer: String read RRefferer write RRefferer;
+    property UserAgent: String read RUserAgent write RUserAgent;
   end;
 
   THTTPBasicAuth = record
@@ -282,7 +291,7 @@ begin
   if RProxy <> '' then OpenTypeFlags := INTERNET_OPEN_TYPE_PROXY
   else OpenTypeFlags := INTERNET_OPEN_TYPE_PRECONFIG;
 
-  hInet := InternetOpen(PChar(RHeaders.UserAgent), OpenTypeFlags, PChar(RProxy), PChar(RProxyBypass), 0);
+  hInet := InternetOpen(PChar(RHeaders.RUserAgent), OpenTypeFlags, PChar(RProxy), PChar(RProxyBypass), 0);
 
   InternetSetOption(hInet, INTERNET_OPTION_CONNECT_TIMEOUT, @RConnectTimeout, SizeOf(RConnectTimeout));
   InternetSetOption(hInet, INTERNET_OPTION_RECEIVE_TIMEOUT, @RReadTimeout, SizeOf(RReadTimeout));
@@ -312,7 +321,7 @@ begin
           OpenRequestFlags := OpenRequestFlags or INTERNET_FLAG_NO_COOKIES;
 
       hRequest := HttpOpenRequest(hConnect, PChar(Method), PChar(Resource + ExtraInfo), HTTP_VERSION,
-        PChar(RHeaders.Refferer), nil, OpenRequestFlags, 0);
+        PChar(RHeaders.RRefferer), nil, OpenRequestFlags, 0);
       if hRequest = nil then begin
         ErrorCode := GetLastError;
         raise Exception.Create(Format('HttpOpenRequest Error %d Description %s',
@@ -376,6 +385,7 @@ constructor THTTPSender.Create(AOwner: TComponent);
 begin
   inherited;
   RCookies := THTTPCookieCollection.Create;
+  RHeaders := THTTPHeaders.Create;
   RReadTimeout := 60000;
   RConnectTimeout := 60000;
   RSendTimeout := 60000;
@@ -384,13 +394,13 @@ begin
   RUseIECookies := true;
   RAllowCookies := true;
   with RHeaders do begin
-    ContentType := 'application/x-www-form-urlencoded';
-    Accept := '';
-    AcceptLanguage := '';
-    AcceptEncoding := '';
-    ExtraHeaders := '';
-    Refferer := '';
-    UserAgent := 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)';
+    RContentType := 'application/x-www-form-urlencoded';
+    RAccept := '';
+    RAcceptLanguage := '';
+    RAcceptEncoding := '';
+    RExtraHeaders := '';
+    RRefferer := '';
+    RUserAgent := 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)';
   end;
 end;
 
@@ -415,11 +425,11 @@ function THTTPSender.GetHeaders: PWideChar;
 begin
   Result := '';
   with RHeaders do begin
-    if ContentType <> '' then Result := PChar(Format('%sContent-type: %s'#10#13, [Result, ContentType]));
-    if AcceptLanguage <> '' then Result := PChar(Format('%sAccept-Language: %s'#10#13, [Result, AcceptLanguage]));
-    if AcceptEncoding <> '' then Result := PChar(Format('%sAccept-Encoding: %s'#10#13, [Result, AcceptEncoding]));
-    if Accept <> '' then Result := PChar(Format('%sAccept: %s'#10#13, [Result, Accept]));
-    if ExtraHeaders <> '' then Result := PChar(Format('%s'#10#13'%s'#10#13, [Result, ExtraHeaders]));
+    if RContentType <> '' then Result := PChar(Format('%sContent-type: %s'#10#13, [Result, RContentType]));
+    if RAcceptLanguage <> '' then Result := PChar(Format('%sAccept-Language: %s'#10#13, [Result, RAcceptLanguage]));
+    if RAcceptEncoding <> '' then Result := PChar(Format('%sAccept-Encoding: %s'#10#13, [Result, RAcceptEncoding]));
+    if RAccept <> '' then Result := PChar(Format('%sAccept: %s'#10#13, [Result, RAccept]));
+    if RExtraHeaders <> '' then Result := PChar(Format('%s'#10#13'%s'#10#13, [Result, RExtraHeaders]));
   end;
 end;
 
