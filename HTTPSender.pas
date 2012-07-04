@@ -409,6 +409,7 @@ begin
   RProxyBypass := '';
   RUseIECookies := true;
   RAllowCookies := true;
+  RAutoRedirects := true;
   with RHeaders do begin
     RContentType := 'application/x-www-form-urlencoded';
     RAccept := '';
