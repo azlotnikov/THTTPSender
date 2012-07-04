@@ -21,7 +21,7 @@ type
   THTTPCookieCollection = class(TPersistent)
   private
     Cookies: THTTPCookieArray;
-    RCustomCookies: string;
+    RCustomCookies: TStringList;
     function GetCookie(Index: Integer): THTTPCookie;
     procedure PutCookie(Index: Integer; Cookie: THTTPCookie);
   public
@@ -31,8 +31,9 @@ type
     function Count: Integer;
     function GetCookies(Domain, Path: string): string;
     procedure Clear;
+    constructor Create;
   published
-    property CustomCookies: string read RCustomCookies write RCustomCookies;
+    property CustomCookies: TStringList read RCustomCookies write RCustomCookies;
 
   end;
 
@@ -53,15 +54,17 @@ type
     RAccept: String;
     RAcceptLanguage: String;
     RAcceptEncoding: String;
-    RExtraHeaders: string;
+    RExtraHeaders: TStringList;
     RRefferer: string;
     RUserAgent: string;
+  public
+    constructor Create;
   published
     property ContentType: String read RContentType write RContentType;
     property Accept: String read RAccept write RAccept;
     property AcceptLanguage: String read RAcceptLanguage write RAcceptLanguage;
     property AcceptEncoding: String read RAcceptEncoding write RAcceptEncoding;
-    property ExtraHeaders: String read RExtraHeaders write RExtraHeaders;
+    property ExtraHeaders: TStringList read RExtraHeaders write RExtraHeaders;
     property Refferer: String read RRefferer write RRefferer;
     property UserAgent: String read RUserAgent write RUserAgent;
   end;
@@ -105,6 +108,7 @@ type
     function GetWinInetError(ErrorCode: Cardinal): string;
     function GetQueryInfo(hRequest: Pointer; Flag: Integer): String;
     function GetHeaders: PWideChar;
+    function GetAbout: string;
     procedure ProcessCookies(Data: string);
     procedure URLExecute(HTTPS: boolean; const ServerName, Resource, ExtraInfo: string; Method: String; Stream: TStream;
       const PostData: AnsiString = '');
@@ -136,6 +140,7 @@ type
     property OnWorkBegin: TWorkBeginEvent read ROnWorkBegin write ROnWorkBegin;
     property OnWork: TWorkEvent read ROnWork write ROnWork;
     property OnWorkEnd: TWorkEndEvent read ROnWorkEnd write ROnWorkEnd;
+    property About: String read GetAbout;
   end;
 
 procedure Register;
@@ -409,7 +414,7 @@ begin
     RAccept := '';
     RAcceptLanguage := '';
     RAcceptEncoding := '';
-    RExtraHeaders := '';
+    RExtraHeaders.Text := '';
     RRefferer := '';
     RUserAgent := 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)';
   end;
@@ -425,10 +430,16 @@ procedure THTTPSender.Get(URL: String; Stream: TStream);
 var
   Host, Resource, ExtraInfo: string;
 begin
+  // URL := URLEncode(URL);
   RResponseText := '';
   ParseURL(URL, Host, Resource, ExtraInfo);
   if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'GET', Stream)
   else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
+end;
+
+function THTTPSender.GetAbout: string;
+begin
+  Result := 'Z.Razor | zt.am | 05.07.12';
 end;
 
 function THTTPSender.Get(URL: String): string;
@@ -457,7 +468,7 @@ begin
     if RAcceptLanguage <> '' then Result := PChar(Format('%sAccept-Language: %s'#10#13, [Result, RAcceptLanguage]));
     if RAcceptEncoding <> '' then Result := PChar(Format('%sAccept-Encoding: %s'#10#13, [Result, RAcceptEncoding]));
     if RAccept <> '' then Result := PChar(Format('%sAccept: %s'#10#13, [Result, RAccept]));
-    if RExtraHeaders <> '' then Result := PChar(Format('%s'#10#13'%s'#10#13, [Result, RExtraHeaders]));
+    if RExtraHeaders.Text <> '' then Result := PChar(Format('%s'#10#13'%s'#10#13, [Result, RExtraHeaders.Text]));
   end;
 end;
 
@@ -484,6 +495,7 @@ var
   Host, Resource, ExtraInfo: string;
 begin
   RResponseText := '';
+  // URL := URLEncode(URL);
   ParseURL(URL, Host, Resource, ExtraInfo);
   if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'POST', Stream, PostData)
   else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
@@ -551,6 +563,7 @@ var
   Host, Resource, ExtraInfo: string;
 begin
   RResponseText := '';
+  // URL := URLEncode(URL);
   ParseURL(URL, Host, Resource, ExtraInfo);
   if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'PUT', Stream)
   else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
@@ -582,6 +595,12 @@ begin
   Result := Length(Cookies);
 end;
 
+constructor THTTPCookieCollection.Create;
+begin
+  inherited;
+  RCustomCookies := TStringList.Create;
+end;
+
 function THTTPCookieCollection.DeleteCookie(Index: Integer): boolean;
 var
   i: Integer;
@@ -610,7 +629,7 @@ begin
   Result := 'Cookies:';
   for i := 0 to High(Cookies) do
     if Cookies[i].FDomain = Domain then Result := Format('%s %s=%s;', [Result, Cookies[i].FName, Cookies[i].FValue]);
-  Result := Result + ' ' + RCustomCookies;
+  Result := Result + ' ' + RCustomCookies.Text;
   if Result[Length(Result) - 1] = ';' then Delete(Result, Length(Result) - 1, 2);
   if Length(Result) = 7 then Result := '';
 end;
@@ -623,6 +642,14 @@ end;
 procedure Register;
 begin
   RegisterComponents('Internet', [THTTPSender]);
+end;
+
+{ THTTPHeaders }
+
+constructor THTTPHeaders.Create;
+begin
+  inherited;
+  RExtraHeaders := TStringList.Create;
 end;
 
 end.
