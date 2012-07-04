@@ -1,11 +1,11 @@
 ﻿	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 		<PropertyGroup>
 			<ProjectGuid>{D3494098-FC44-422E-984F-65801CD0E8D5}</ProjectGuid>
-			<MainSource>D_XE2.dpk</MainSource>
+			<MainSource>HTTPSender_XE2.dpk</MainSource>
 			<ProjectVersion>13.4</ProjectVersion>
 			<FrameworkType>None</FrameworkType>
 			<Base>True</Base>
-			<Config Condition="'$(Config)'==''">Debug</Config>
+			<Config Condition="'$(Config)'==''">Release</Config>
 			<Platform Condition="'$(Platform)'==''">Win32</Platform>
 			<TargetedPlatforms>1</TargetedPlatforms>
 			<AppType>Package</AppType>
@@ -35,8 +35,9 @@
 			<Base>true</Base>
 		</PropertyGroup>
 		<PropertyGroup Condition="'$(Base)'!=''">
-			<DCC_CBuilderOutput>All</DCC_CBuilderOutput>
+			<DCC_UsePackage>rtl;$(DCC_UsePackage)</DCC_UsePackage>
 			<GenPackage>true</GenPackage>
+			<DCC_CBuilderOutput>All</DCC_CBuilderOutput>
 			<GenDll>true</GenDll>
 			<DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
 			<DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
@@ -75,6 +76,10 @@
 			</DelphiCompile>
 			<DCCReference Include="rtl.dcp"/>
 			<DCCReference Include="HTTPSender.pas"/>
+			<RcItem Include="THTTPSender.bmp">
+				<ResourceType>BITMAP</ResourceType>
+				<ResourceId>THTTPSENDER</ResourceId>
+			</RcItem>
 			<BuildConfiguration Include="Release">
 				<Key>Cfg_2</Key>
 				<CfgParent>Base</CfgParent>
@@ -93,7 +98,7 @@
 			<BorlandProject>
 				<Delphi.Personality>
 					<Source>
-						<Source Name="MainSource">D_XE2.dpk</Source>
+						<Source Name="MainSource">HTTPSender_XE2.dpk</Source>
 					</Source>
 					<VersionInfo>
 						<VersionInfo Name="IncludeVerInfo">True</VersionInfo>
@@ -122,6 +127,10 @@
 						<VersionInfoKeys Name="ProductVersion">1.0.0.0</VersionInfoKeys>
 						<VersionInfoKeys Name="Comments"/>
 					</VersionInfoKeys>
+					<Excluded_Packages>
+						<Excluded_Packages Name="$(BDSBIN)\dcloffice2k160.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+						<Excluded_Packages Name="$(BDSBIN)\dclofficexp160.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+					</Excluded_Packages>
 				</Delphi.Personality>
 				<Deployment/>
 				<Platforms>

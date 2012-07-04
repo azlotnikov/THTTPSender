@@ -66,9 +66,13 @@ type
     property UserAgent: String read RUserAgent write RUserAgent;
   end;
 
-  THTTPBasicAuth = record
-    Username: string;
-    Password: string;
+  THTTPBasicAuth = class(TPersistent)
+  private
+    RUsername: string;
+    RPassword: string;
+  published
+    property Username: string read RUsername write RUsername;
+    property Password: string read RPassword write RPassword;
   end;
 
 type
@@ -102,15 +106,18 @@ type
     function GetQueryInfo(hRequest: Pointer; Flag: Integer): String;
     function GetHeaders: PWideChar;
     procedure ProcessCookies(Data: string);
-    procedure URLExecute(HTTPS: boolean; const ServerName, Resource, ExtraInfo: string; Method: String;
+    procedure URLExecute(HTTPS: boolean; const ServerName, Resource, ExtraInfo: string; Method: String; Stream: TStream;
       const PostData: AnsiString = '');
     procedure ParseURL(const lpszUrl: string; var Host, Resource, ExtraInfo: string);
   public
     property Response: THTTPResponse read RResponse;
     property ResponseText: AnsiString read RResponseText;
-    function Get(URL: String): AnsiString;
-    function Post(URL: String; PostData: AnsiString): AnsiString;
-    function Put(URL: String): AnsiString;
+    function Get(URL: String): string; overload;
+    function Post(URL: String; PostData: AnsiString): string; overload;
+    function Put(URL: String): string; overload;
+    procedure Get(URL: String; Stream: TStream); overload;
+    procedure Post(URL: String; PostData: AnsiString; Stream: TStream); overload;
+    procedure Put(URL: String; Stream: TStream); overload;
     procedure Free;
     constructor Create(AOwner: TComponent); override;
   published
@@ -225,9 +232,10 @@ begin
 end;
 
 procedure THTTPSender.URLExecute(HTTPS: boolean; const ServerName, Resource, ExtraInfo: string; Method: String;
-  const PostData: AnsiString = '');
+  Stream: TStream; const PostData: AnsiString = '');
 const
   C_PROXYCONNECTION = 'Proxy-Connection: Keep-Alive'#10#13;
+  BuffSize = 1024;
 var
   hInet: HINTERNET;
   hConnect: HINTERNET;
@@ -243,7 +251,7 @@ var
   PostDataPointer: Pointer;
   PostDataLength: DWORD;
   lpOtherHeaders: String;
-  Buffer: array [0 .. 1024] of AnsiChar;
+  Buffer: Pointer;
 
   function ExtractHeaders: boolean;
   var
@@ -285,7 +293,6 @@ begin
     ContentLength := 0;
     Expires := '';
   end;
-  RResponseText := '';
   lpOtherHeaders := '';
 
   if RProxy <> '' then OpenTypeFlags := INTERNET_OPEN_TYPE_PROXY
@@ -305,8 +312,8 @@ begin
   try
     if HTTPS then ConnectPort := INTERNET_DEFAULT_HTTPS_PORT
     else ConnectPort := INTERNET_DEFAULT_HTTP_PORT;
-    hConnect := InternetConnect(hInet, PChar(ServerName), ConnectPort, PChar(RBasicAuth.Username),
-      PChar(RBasicAuth.Password), INTERNET_SERVICE_HTTP, 0, 0);
+    hConnect := InternetConnect(hInet, PChar(ServerName), ConnectPort, PChar(RBasicAuth.RUsername),
+      PChar(RBasicAuth.RPassword), INTERNET_SERVICE_HTTP, 0, 0);
     if hConnect = nil then begin
       ErrorCode := GetLastError;
       raise Exception.Create(Format('InternetConnect Error %d Description %s',
@@ -356,19 +363,22 @@ begin
             [ErrorCode, GetWinInetError(ErrorCode)]));
         end;
         if Assigned(ROnWorkBegin) then ROnWorkBegin(self, Response.ContentLength);
-        if RResponse.StatusCode = 200 then begin
-          repeat
-            if not InternetReadFile(hRequest, @Buffer, SizeOf(Buffer), dwBytesRead) then begin
-              ErrorCode := GetLastError;
-              raise Exception.Create(Format('InternetReadFile Error %d Description %s',
-                [ErrorCode, GetWinInetError(ErrorCode)]));
-            end;
-            Buffer[dwBytesRead] := #0;
-            lpvBuffer := PansiChar(@Buffer);
-            RResponseText := RResponseText + AnsiString(lpvBuffer);
-            if Assigned(ROnWork) then ROnWork(self, Length(RResponseText));
-          until dwBytesRead = 0;
-        end;
+        if RResponse.StatusCode = 200 then
+          try
+            Stream.Seek(0, 0);
+            GetMem(Buffer, BuffSize);
+            repeat
+              if not InternetReadFile(hRequest, Buffer, BuffSize, dwBytesRead) then begin
+                ErrorCode := GetLastError;
+                raise Exception.Create(Format('InternetReadFile Error %d Description %s',
+                  [ErrorCode, GetWinInetError(ErrorCode)]));
+              end;
+              if dwBytesRead > 0 then Stream.WriteBuffer(Buffer^, dwBytesRead);
+              if Assigned(ROnWork) then ROnWork(self, Stream.size);
+            until dwBytesRead = 0;
+          finally
+            FreeMem(Buffer);
+          end;
         if Assigned(ROnWorkEnd) then ROnWorkEnd(self);
       finally
         InternetCloseHandle(hRequest);
@@ -386,6 +396,7 @@ begin
   inherited;
   RCookies := THTTPCookieCollection.Create;
   RHeaders := THTTPHeaders.Create;
+  BasicAuth := THTTPBasicAuth.Create;
   RReadTimeout := 60000;
   RConnectTimeout := 60000;
   RSendTimeout := 60000;
@@ -410,15 +421,32 @@ begin
   Destroy;
 end;
 
-function THTTPSender.Get(URL: String): AnsiString;
+procedure THTTPSender.Get(URL: String; Stream: TStream);
 var
   Host, Resource, ExtraInfo: string;
 begin
-  Result := '';
+  RResponseText := '';
   ParseURL(URL, Host, Resource, ExtraInfo);
-  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'GET')
+  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'GET', Stream)
   else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
-  Result := RResponseText;
+end;
+
+function THTTPSender.Get(URL: String): string;
+var
+  StringStream: TStringStream;
+begin
+  Result := '';
+  StringStream := TStringStream.Create('', TEncoding.ASCII);
+  try
+    Get(URL, StringStream);
+    if StringStream.size > 0 then begin
+      StringStream.Seek(0, 0);
+      Result := StringStream.ReadString(StringStream.size);
+      RResponseText := Result;
+    end;
+  finally
+    StringStream.Free;
+  end;
 end;
 
 function THTTPSender.GetHeaders: PWideChar;
@@ -433,15 +461,32 @@ begin
   end;
 end;
 
-function THTTPSender.Post(URL: String; PostData: AnsiString): AnsiString;
+function THTTPSender.Post(URL: String; PostData: AnsiString): string;
+var
+  StringStream: TStringStream;
+begin
+  Result := '';
+  StringStream := TStringStream.Create('', TEncoding.ASCII);
+  try
+    Post(URL, PostData, StringStream);
+    if StringStream.size > 0 then begin
+      StringStream.Seek(0, 0);
+      Result := StringStream.ReadString(StringStream.size);
+      RResponseText := Result;
+    end;
+  finally
+    StringStream.Free;
+  end;
+end;
+
+procedure THTTPSender.Post(URL: String; PostData: AnsiString; Stream: TStream);
 var
   Host, Resource, ExtraInfo: string;
 begin
-  Result := '';
+  RResponseText := '';
   ParseURL(URL, Host, Resource, ExtraInfo);
-  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'POST', PostData)
+  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'POST', Stream, PostData)
   else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
-  Result := RResponseText;
 end;
 
 function Pars(const source, left, right: string): string;
@@ -460,17 +505,17 @@ const
 var
   NCookie: THTTPCookie;
 
-  function GetCookie(s: string): THTTPCookie;
+  function GetCookie(S: string): THTTPCookie;
   var
     t: string;
   begin
     with Result do begin
-      FName := Copy(s, 1, Pos('=', s) - 1);
-      FValue := Pars(s, '=', ';');
-      FPath := Pars(s, 'path=', ';');
-      FExpires := Pars(s, 'expires=', ';');
-      FDomain := Pars(s, 'domain=', ';');
-      FHTTPOnly := (Pos('; HttpOnly', s) > 0);
+      FName := Copy(S, 1, Pos('=', S) - 1);
+      FValue := Pars(S, '=', ';');
+      FPath := Pars(S, 'path=', ';');
+      FExpires := Pars(S, 'expires=', ';');
+      FDomain := Pars(S, 'domain=', ';');
+      FHTTPOnly := (Pos('; HttpOnly', S) > 0);
     end;
   end;
 
@@ -483,15 +528,32 @@ begin
   end;
 end;
 
-function THTTPSender.Put(URL: String): AnsiString;
+function THTTPSender.Put(URL: String): string;
+var
+  StringStream: TStringStream;
+begin
+  Result := '';
+  StringStream := TStringStream.Create('', TEncoding.ASCII);
+  try
+    Put(URL, StringStream);
+    if StringStream.size > 0 then begin
+      StringStream.Seek(0, 0);
+      Result := StringStream.ReadString(StringStream.size);
+      RResponseText := Result;
+    end;
+  finally
+    StringStream.Free;
+  end;
+end;
+
+procedure THTTPSender.Put(URL: String; Stream: TStream);
 var
   Host, Resource, ExtraInfo: string;
 begin
-  Result := '';
+  RResponseText := '';
   ParseURL(URL, Host, Resource, ExtraInfo);
-  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'PUT')
+  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'PUT', Stream)
   else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
-  Result := RResponseText;
 end;
 
 { THTTPCookieCollection }
