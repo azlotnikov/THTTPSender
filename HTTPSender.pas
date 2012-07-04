@@ -346,7 +346,7 @@ begin
           raise Exception.Create(Format('HttpQueryInfo Error %d Description %s',
             [ErrorCode, GetWinInetError(ErrorCode)]));
         end;
-        ROnWorkBegin(self, Response.ContentLength);
+        if Assigned(ROnWorkBegin) then ROnWorkBegin(self, Response.ContentLength);
         if RResponse.StatusCode = 200 then begin
           repeat
             if not InternetReadFile(hRequest, @Buffer, SizeOf(Buffer), dwBytesRead) then begin
@@ -357,10 +357,10 @@ begin
             Buffer[dwBytesRead] := #0;
             lpvBuffer := PansiChar(@Buffer);
             RResponseText := RResponseText + AnsiString(lpvBuffer);
-            ROnWork(self, Length(RResponseText));
+            if Assigned(ROnWork) then ROnWork(self, Length(RResponseText));
           until dwBytesRead = 0;
         end;
-        ROnWorkEnd(self);
+        if Assigned(ROnWorkEnd) then ROnWorkEnd(self);
       finally
         InternetCloseHandle(hRequest);
       end;
@@ -468,7 +468,7 @@ begin
   while Pos(SetCookie, Data) > 0 do begin
     NCookie := GetCookie(Pars(Data, SetCookie, #10#13));
     RCookies.Add(NCookie, true);
-    ROnCookieAdd(self, NCookie);
+    if Assigned(ROnCookieAdd) then ROnCookieAdd(self, NCookie);
     Delete(Data, Pos(SetCookie, Data), Length(SetCookie));
   end;
 end;
