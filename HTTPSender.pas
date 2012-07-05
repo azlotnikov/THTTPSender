@@ -54,7 +54,7 @@ type
     RAccept: String;
     RAcceptLanguage: String;
     RAcceptEncoding: String;
-    RExtraHeaders: TStringList;
+    RCustomHeaders: TStringList;
     RRefferer: string;
     RUserAgent: string;
   public
@@ -64,7 +64,7 @@ type
     property Accept: String read RAccept write RAccept;
     property AcceptLanguage: String read RAcceptLanguage write RAcceptLanguage;
     property AcceptEncoding: String read RAcceptEncoding write RAcceptEncoding;
-    property ExtraHeaders: TStringList read RExtraHeaders write RExtraHeaders;
+    property CustomHeaders: TStringList read RCustomHeaders write RCustomHeaders;
     property Refferer: String read RRefferer write RRefferer;
     property UserAgent: String read RUserAgent write RUserAgent;
   end;
@@ -131,8 +131,8 @@ type
     property AllowCookies: boolean read RAllowCookies write RAllowCookies default true;
     property AutoRedirects: boolean read RAutoRedirects write RAutoRedirects default true;
     property ConnectTimeout: Integer read RConnectTimeout write RConnectTimeout default 60000;
-    property ReadTimeout: Integer read RReadTimeout write RReadTimeout default 60000;
-    property SendTimeout: Integer read RSendTimeout write RSendTimeout default 60000;
+    property ReadTimeout: Integer read RReadTimeout write RReadTimeout default 0;
+    property SendTimeout: Integer read RSendTimeout write RSendTimeout default 0;
     property UseIECookies: boolean read RUseIECookies write RUseIECookies default true;
     property Headers: THTTPHeaders read RHeaders write RHeaders;
     property BasicAuth: THTTPBasicAuth read RBasicAuth write RBasicAuth;
@@ -305,9 +305,11 @@ begin
 
   hInet := InternetOpen(PChar(RHeaders.RUserAgent), OpenTypeFlags, PChar(RProxy), PChar(RProxyBypass), 0);
 
-  InternetSetOption(hInet, INTERNET_OPTION_CONNECT_TIMEOUT, @RConnectTimeout, SizeOf(RConnectTimeout));
-  InternetSetOption(hInet, INTERNET_OPTION_RECEIVE_TIMEOUT, @RReadTimeout, SizeOf(RReadTimeout));
-  InternetSetOption(hInet, INTERNET_OPTION_SEND_TIMEOUT, @RSendTimeout, SizeOf(RSendTimeout));
+  if RConnectTimeout > 0 then
+      InternetSetOption(hInet, INTERNET_OPTION_CONNECT_TIMEOUT, @RConnectTimeout, SizeOf(RConnectTimeout));
+  if RReadTimeout > 0 then
+      InternetSetOption(hInet, INTERNET_OPTION_RECEIVE_TIMEOUT, @RReadTimeout, SizeOf(RReadTimeout));
+  if RSendTimeout > 0 then InternetSetOption(hInet, INTERNET_OPTION_SEND_TIMEOUT, @RSendTimeout, SizeOf(RSendTimeout));
 
   if hInet = nil then begin
     ErrorCode := GetLastError;
@@ -402,9 +404,9 @@ begin
   RCookies := THTTPCookieCollection.Create;
   RHeaders := THTTPHeaders.Create;
   BasicAuth := THTTPBasicAuth.Create;
-  RReadTimeout := 60000;
+  RReadTimeout := 0;
   RConnectTimeout := 60000;
-  RSendTimeout := 60000;
+  RSendTimeout := 0;
   RProxy := '';
   RProxyBypass := '';
   RUseIECookies := true;
@@ -415,7 +417,7 @@ begin
     RAccept := '';
     RAcceptLanguage := '';
     RAcceptEncoding := '';
-    RExtraHeaders.Text := '';
+    RCustomHeaders.Text := '';
     RRefferer := '';
     RUserAgent := 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)';
   end;
@@ -469,7 +471,7 @@ begin
     if RAcceptLanguage <> '' then Result := PChar(Format('%sAccept-Language: %s'#10#13, [Result, RAcceptLanguage]));
     if RAcceptEncoding <> '' then Result := PChar(Format('%sAccept-Encoding: %s'#10#13, [Result, RAcceptEncoding]));
     if RAccept <> '' then Result := PChar(Format('%sAccept: %s'#10#13, [Result, RAccept]));
-    if RExtraHeaders.Text <> '' then Result := PChar(Format('%s'#10#13'%s'#10#13, [Result, RExtraHeaders.Text]));
+    if RCustomHeaders.Text <> '' then Result := PChar(Format('%s'#10#13'%s'#10#13, [Result, RCustomHeaders.Text]));
   end;
 end;
 
@@ -650,7 +652,7 @@ end;
 constructor THTTPHeaders.Create;
 begin
   inherited;
-  RExtraHeaders := TStringList.Create;
+  RCustomHeaders := TStringList.Create;
 end;
 
 end.
