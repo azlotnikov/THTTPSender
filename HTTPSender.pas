@@ -85,6 +85,16 @@ type
   TWorkEndEvent = procedure(Sender: TObject) of object;
 
 type
+  THTTPPostParam = record
+  end;
+
+type
+  THTTPContainer = class
+  private
+
+  end;
+
+type
   THTTPSender = class(TComponent)
   private
     RResponse: THTTPResponse;
@@ -104,7 +114,6 @@ type
     ROnWork: TWorkEvent;
     ROnWorkEnd: TWorkEndEvent;
     RCookies: THTTPCookieCollection;
-    function URLEncode(const URL: string): string;
     function GetWinInetError(ErrorCode: Cardinal): string;
     function GetQueryInfo(hRequest: Pointer; Flag: Integer): String;
     function GetHeaders: PWideChar;
@@ -114,11 +123,13 @@ type
       const PostData: AnsiString = '');
     procedure ParseURL(const lpszUrl: string; var Host, Resource, ExtraInfo: string);
   public
+    DefaultEncoding: TEncoding;
     property Response: THTTPResponse read RResponse;
     property ResponseText: AnsiString read RResponseText;
     function Get(URL: String): string; overload;
     function Post(URL: String; PostData: AnsiString): string; overload;
     function Put(URL: String): string; overload;
+    function URLEncode(const URL: string): string;
     procedure Get(URL: String; Stream: TStream); overload;
     procedure Post(URL: String; PostData: AnsiString; Stream: TStream); overload;
     procedure Put(URL: String; Stream: TStream); overload;
@@ -412,6 +423,7 @@ begin
   RUseIECookies := true;
   RAllowCookies := true;
   RAutoRedirects := true;
+  DefaultEncoding := TEncoding.UTF8;
   with RHeaders do begin
     RContentType := 'application/x-www-form-urlencoded';
     RAccept := '';
@@ -429,38 +441,9 @@ begin
   Destroy;
 end;
 
-procedure THTTPSender.Get(URL: String; Stream: TStream);
-var
-  Host, Resource, ExtraInfo: string;
-begin
-  // URL := URLEncode(URL);
-  RResponseText := '';
-  ParseURL(URL, Host, Resource, ExtraInfo);
-  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'GET', Stream)
-  else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
-end;
-
 function THTTPSender.GetAbout: string;
 begin
   Result := 'Z.Razor | zt.am | 05.07.12';
-end;
-
-function THTTPSender.Get(URL: String): string;
-var
-  StringStream: TStringStream;
-begin
-  Result := '';
-  StringStream := TStringStream.Create('', TEncoding.ASCII);
-  try
-    Get(URL, StringStream);
-    if StringStream.size > 0 then begin
-      StringStream.Seek(0, 0);
-      Result := StringStream.ReadString(StringStream.size);
-      RResponseText := Result;
-    end;
-  finally
-    StringStream.Free;
-  end;
 end;
 
 function THTTPSender.GetHeaders: PWideChar;
@@ -475,12 +458,41 @@ begin
   end;
 end;
 
+procedure THTTPSender.Get(URL: String; Stream: TStream);
+var
+  Host, Resource, ExtraInfo: string;
+begin
+  // URL := URLEncode(URL);
+  RResponseText := '';
+  ParseURL(URL, Host, Resource, ExtraInfo);
+  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'GET', Stream)
+  else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
+end;
+
+function THTTPSender.Get(URL: String): string;
+var
+  StringStream: TStringStream;
+begin
+  Result := '';
+  StringStream := TStringStream.Create('', DefaultEncoding);
+  try
+    Get(URL, StringStream);
+    if StringStream.size > 0 then begin
+      StringStream.Seek(0, 0);
+      Result := StringStream.ReadString(StringStream.size);
+      RResponseText := Result;
+    end;
+  finally
+    StringStream.Free;
+  end;
+end;
+
 function THTTPSender.Post(URL: String; PostData: AnsiString): string;
 var
   StringStream: TStringStream;
 begin
   Result := '';
-  StringStream := TStringStream.Create('', TEncoding.ASCII);
+  StringStream := TStringStream.Create('', DefaultEncoding);
   try
     Post(URL, PostData, StringStream);
     if StringStream.size > 0 then begin
@@ -501,6 +513,35 @@ begin
   // URL := URLEncode(URL);
   ParseURL(URL, Host, Resource, ExtraInfo);
   if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'POST', Stream, PostData)
+  else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
+end;
+
+function THTTPSender.Put(URL: String): string;
+var
+  StringStream: TStringStream;
+begin
+  Result := '';
+  StringStream := TStringStream.Create('', DefaultEncoding);
+  try
+    Put(URL, StringStream);
+    if StringStream.size > 0 then begin
+      StringStream.Seek(0, 0);
+      Result := StringStream.ReadString(StringStream.size);
+      RResponseText := Result;
+    end;
+  finally
+    StringStream.Free;
+  end;
+end;
+
+procedure THTTPSender.Put(URL: String; Stream: TStream);
+var
+  Host, Resource, ExtraInfo: string;
+begin
+  RResponseText := '';
+  // URL := URLEncode(URL);
+  ParseURL(URL, Host, Resource, ExtraInfo);
+  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'PUT', Stream)
   else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
 end;
 
@@ -541,35 +582,6 @@ begin
     if Assigned(ROnCookieAdd) then ROnCookieAdd(self, NCookie);
     Delete(Data, Pos(SetCookie, Data), Length(SetCookie));
   end;
-end;
-
-function THTTPSender.Put(URL: String): string;
-var
-  StringStream: TStringStream;
-begin
-  Result := '';
-  StringStream := TStringStream.Create('', TEncoding.ASCII);
-  try
-    Put(URL, StringStream);
-    if StringStream.size > 0 then begin
-      StringStream.Seek(0, 0);
-      Result := StringStream.ReadString(StringStream.size);
-      RResponseText := Result;
-    end;
-  finally
-    StringStream.Free;
-  end;
-end;
-
-procedure THTTPSender.Put(URL: String; Stream: TStream);
-var
-  Host, Resource, ExtraInfo: string;
-begin
-  RResponseText := '';
-  // URL := URLEncode(URL);
-  ParseURL(URL, Host, Resource, ExtraInfo);
-  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'PUT', Stream)
-  else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
 end;
 
 { THTTPCookieCollection }
