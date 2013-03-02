@@ -1,7 +1,7 @@
 ﻿	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 		<PropertyGroup>
 			<ProjectGuid>{D3494098-FC44-422E-984F-65801CD0E8D5}</ProjectGuid>
-			<MainSource>HTTPSender_XE2.dpk</MainSource>
+			<MainSource>HTTPSender_Package.dpk</MainSource>
 			<ProjectVersion>13.4</ProjectVersion>
 			<FrameworkType>None</FrameworkType>
 			<Base>True</Base>
@@ -98,7 +98,7 @@
 			<BorlandProject>
 				<Delphi.Personality>
 					<Source>
-						<Source Name="MainSource">HTTPSender_XE2.dpk</Source>
+						<Source Name="MainSource">HTTPSender_Package.dpk</Source>
 					</Source>
 					<VersionInfo>
 						<VersionInfo Name="IncludeVerInfo">True</VersionInfo>

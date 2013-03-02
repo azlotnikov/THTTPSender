@@ -1,19 +1,23 @@
 ﻿unit HTTPSender;
 
-interface
+// (c) Z.Razor | zt.am | 2012 - 2013
+// For Delphi 2010 and Higher
 
-// (c) Z.Razor | zt.am | 2012
+interface
 
 uses Windows, WinInet, Classes, Sysutils;
 
 type
+  THTTPMethod = (hmGet, hmPut, hmPost);
+
+type
   THTTPCookie = record
-    FDomain: String;
-    FName: String;
-    FValue: String;
-    FExpires: String;
-    FPath: String;
-    FHTTPOnly: boolean;
+    Domain: String;
+    Name: String;
+    Value: String;
+    Expires: String;
+    Path: String;
+    HTTPOnly: boolean;
   end;
 
   THTTPCookieArray = array of THTTPCookie;
@@ -29,7 +33,7 @@ type
     function Add(Cookie: THTTPCookie; ReplaceIfExists: boolean): Integer;
     function DeleteCookie(Index: Integer): boolean;
     function Count: Integer;
-    function GetCookies(Domain, Path: string): string;
+    function GetCookies(ADomain, APath: String): String;
     procedure Clear;
     constructor Create;
   published
@@ -40,8 +44,8 @@ type
 type
   THTTPResponse = record
     StatusCode: Integer;
-    StatusText: string;
-    RawHeaders: string;
+    StatusText: String;
+    RawHeaders: String;
     ContentLength: Integer;
     ContentEncoding: String;
     Location: String;
@@ -55,8 +59,8 @@ type
     RAcceptLanguage: String;
     RAcceptEncoding: String;
     RCustomHeaders: TStringList;
-    RRefferer: string;
-    RUserAgent: string;
+    RRefferer: String;
+    RUserAgent: String;
   public
     constructor Create;
   published
@@ -71,11 +75,11 @@ type
 
   THTTPBasicAuth = class(TPersistent)
   private
-    RUsername: string;
-    RPassword: string;
+    RUsername: String;
+    RPassword: String;
   published
-    property Username: string read RUsername write RUsername;
-    property Password: string read RPassword write RPassword;
+    property Username: String read RUsername write RUsername;
+    property Password: String read RPassword write RPassword;
   end;
 
 type
@@ -85,20 +89,47 @@ type
   TWorkEndEvent = procedure(Sender: TObject) of object;
 
 type
-  THTTPPostParam = record
+  THTTPPostContainerFormField = record
+    Name: ansistring;
+    Value: ansistring;
   end;
 
-type
-  THTTPContainer = class
-  private
+  THTTPPostContainerFormFieldArray = array of THTTPPostContainerFormField;
 
+  THTTPPostContainerFile = record
+    Name: ansistring;
+    FileName: ansistring;
+    ContentType: ansistring;
+  end;
+
+  THTTPPostContainerFileArray = array of THTTPPostContainerFile;
+
+  THTTPPostContainer = class
+  private
+    RFormFields: THTTPPostContainerFormFieldArray;
+    RFiles: THTTPPostContainerFileArray;
+    function GetFile(Index: Integer): THTTPPostContainerFile;
+    function GetFormField(Index: Integer): THTTPPostContainerFormField;
+    procedure SetFile(Index: Integer; Item: THTTPPostContainerFile);
+    procedure SetFormField(Index: Integer; Item: THTTPPostContainerFormField);
+  public
+    function GetFilesCount: Integer;
+    function GetFormFieldsCount: Integer;
+    procedure AddFile(AName, AFileName: ansistring; AContentType: ansistring = 'application/octet-stream');
+    procedure AddFormField(AName, AValue: ansistring);
+    procedure DeleteFile(Index: Integer);
+    procedure DeleteFormField(Index: Integer);
+    procedure ClearFiles;
+    procedure ClearFormFields;
+    property Files[Index: Integer]: THTTPPostContainerFile read GetFile write SetFile;
+    property FormFields[Index: Integer]: THTTPPostContainerFormField read GetFormField write SetFormField;
   end;
 
 type
   THTTPSender = class(TComponent)
   private
     RResponse: THTTPResponse;
-    RResponseText: AnsiString;
+    RResponseText: ansistring;
     RAllowCookies: boolean;
     RAutoRedirects: boolean;
     RConnectTimeout: Integer;
@@ -114,31 +145,38 @@ type
     ROnWork: TWorkEvent;
     ROnWorkEnd: TWorkEndEvent;
     RCookies: THTTPCookieCollection;
-    function GetWinInetError(ErrorCode: Cardinal): string;
+    function GetWinInetError(ErrorCode: Cardinal): String;
     function GetQueryInfo(hRequest: Pointer; Flag: Integer): String;
     function GetHeaders: PWideChar;
-    function GetAbout: string;
-    procedure ProcessCookies(Data: string);
-    procedure URLExecute(HTTPS: boolean; const ServerName, Resource, ExtraInfo: string; Method: String; Stream: TStream;
-      const PostData: AnsiString = '');
-    procedure ParseURL(const lpszUrl: string; var Host, Resource, ExtraInfo: string);
+    function GetAbout: String;
+    function GetMethodString(Method: THTTPMethod): String;
+    function PreURLExecute(URL: String; PostData: ansistring; Method: THTTPMethod): string; overload;
+    function CalcBoundary(PostContainer: THTTPPostContainer): ansistring;
+    function GetPostDataFromPostContainer(PostContainer: THTTPPostContainer): ansistring;
+    procedure ProcessCookies(Data: String);
+    procedure URLExecute(HTTPS: boolean; const ServerName, Resource, ExtraInfo: String; Method: THTTPMethod;
+      Stream: TStream; const PostData: ansistring = '');
+    procedure ParseURL(const lpszUrl: String; var Host, Resource, ExtraInfo: String);
+    procedure PreURLExecute(URL: String; PostData: ansistring; Method: THTTPMethod; Stream: TStream); overload;
   public
     DefaultEncoding: TEncoding;
     property Response: THTTPResponse read RResponse;
-    property ResponseText: AnsiString read RResponseText;
-    function Get(URL: String): string; overload;
-    function Post(URL: String; PostData: AnsiString): string; overload;
-    function Put(URL: String): string; overload;
-    function URLEncode(const URL: string): string;
+    property ResponseText: ansistring read RResponseText;
+    function Get(URL: String): String; overload;
+    function Post(URL: String; PostData: ansistring): String; overload;
+    function Post(URL: String; PostContainer: THTTPPostContainer): String; overload;
+    function Put(URL: String): String; overload;
+    function URLEncode(const URL: String): String;
     procedure Get(URL: String; Stream: TStream); overload;
-    procedure Post(URL: String; PostData: AnsiString; Stream: TStream); overload;
+    procedure Post(URL: String; PostData: ansistring; Stream: TStream); overload;
+    procedure Post(URL: String; PostContainer: THTTPPostContainer; Stream: TStream); overload;
     procedure Put(URL: String; Stream: TStream); overload;
     procedure Free;
     constructor Create(AOwner: TComponent); override;
   published
     property Cookies: THTTPCookieCollection read RCookies write RCookies;
-    property Proxy: string read RProxy write RProxy;
-    property ProxyBypass: string read RProxyBypass write RProxyBypass;
+    property Proxy: String read RProxy write RProxy;
+    property ProxyBypass: String read RProxyBypass write RProxyBypass;
     property AllowCookies: boolean read RAllowCookies write RAllowCookies default true;
     property AutoRedirects: boolean read RAutoRedirects write RAutoRedirects default true;
     property ConnectTimeout: Integer read RConnectTimeout write RConnectTimeout default 60000;
@@ -159,7 +197,8 @@ procedure Register;
 implementation
 
 { THTTPSender }
-function THTTPSender.URLEncode(const URL: string): string;
+
+function THTTPSender.URLEncode(const URL: String): String;
 var
   i: Integer;
 begin
@@ -172,7 +211,7 @@ begin
   end;
 end;
 
-procedure THTTPSender.ParseURL(const lpszUrl: string; var Host, Resource, ExtraInfo: string);
+procedure THTTPSender.ParseURL(const lpszUrl: String; var Host, Resource, ExtraInfo: String);
 var
   lpszScheme: array [0 .. INTERNET_MAX_SCHEME_LENGTH - 1] of Char;
   lpszHostName: array [0 .. INTERNET_MAX_HOST_NAME_LENGTH - 1] of Char;
@@ -228,7 +267,7 @@ begin
   end;
 end;
 
-function THTTPSender.GetWinInetError(ErrorCode: Cardinal): string;
+function THTTPSender.GetWinInetError(ErrorCode: Cardinal): String;
 const
   winetdll = 'wininet.dll';
 var
@@ -247,8 +286,8 @@ begin
   end;
 end;
 
-procedure THTTPSender.URLExecute(HTTPS: boolean; const ServerName, Resource, ExtraInfo: string; Method: String;
-  Stream: TStream; const PostData: AnsiString = '');
+procedure THTTPSender.URLExecute(HTTPS: boolean; const ServerName, Resource, ExtraInfo: String; Method: THTTPMethod;
+  Stream: TStream; const PostData: ansistring = '');
 const
   C_PROXYCONNECTION = 'Proxy-Connection: Keep-Alive'#10#13;
   BuffSize = 1024;
@@ -345,7 +384,7 @@ begin
       if (not RUseIECookies) or (not RAllowCookies) then
           OpenRequestFlags := OpenRequestFlags or INTERNET_FLAG_NO_COOKIES;
 
-      hRequest := HttpOpenRequest(hConnect, PChar(Method), PChar(Resource + ExtraInfo), HTTP_VERSION,
+      hRequest := HttpOpenRequest(hConnect, PChar(GetMethodString(Method)), PChar(Resource + ExtraInfo), HTTP_VERSION,
         PChar(RHeaders.RRefferer), nil, OpenRequestFlags, 0);
       if hRequest = nil then begin
         ErrorCode := GetLastError;
@@ -353,11 +392,11 @@ begin
           [ErrorCode, GetWinInetError(ErrorCode)]));
       end;
       if RAllowCookies and (not RUseIECookies) then
-          lpOtherHeaders := RCookies.GetCookies('.' + ServerName, Resource) + #10#13;
-      if RProxy <> '' then lpOtherHeaders := lpOtherHeaders + C_PROXYCONNECTION + #10#13;
+          lpOtherHeaders := RCookies.GetCookies('.' + ServerName, Resource) + #10;
+      if RProxy <> '' then lpOtherHeaders := lpOtherHeaders + C_PROXYCONNECTION + #10;
 
       try
-        if Method = 'POST' then begin
+        if Method = hmPost then begin
           PostDataPointer := @PostData[1];
           PostDataLength := Length(PostData);
         end else begin
@@ -409,6 +448,11 @@ begin
   end;
 end;
 
+function THTTPSender.CalcBoundary(PostContainer: THTTPPostContainer): ansistring;
+begin
+  Result := '----------030213144452243'; // !
+end;
+
 constructor THTTPSender.Create(AOwner: TComponent);
 begin
   inherited;
@@ -423,9 +467,9 @@ begin
   RUseIECookies := true;
   RAllowCookies := true;
   RAutoRedirects := true;
-  DefaultEncoding := TEncoding.UTF8;
+  DefaultEncoding := TEncoding.ANSI;
   with RHeaders do begin
-    RContentType := 'application/x-www-form-urlencoded';
+    RContentType := '';
     RAccept := '';
     RAcceptLanguage := '';
     RAcceptEncoding := '';
@@ -441,7 +485,7 @@ begin
   Destroy;
 end;
 
-function THTTPSender.GetAbout: string;
+function THTTPSender.GetAbout: String;
 begin
   Result := 'Z.Razor | zt.am | 05.07.12';
 end;
@@ -458,94 +502,97 @@ begin
   end;
 end;
 
+function THTTPSender.GetMethodString(Method: THTTPMethod): String;
+begin
+  case Method of
+    hmGet: Result := 'GET';
+    hmPut: Result := 'PUT';
+    hmPost: Result := 'POST';
+  end;
+end;
+
+function THTTPSender.GetPostDataFromPostContainer(PostContainer: THTTPPostContainer): ansistring;
+var
+  i: Integer;
+  boundary, s: ansistring;
+  ms: TMemoryStream;
+  ss: TStringStream;
+begin
+  Result := '';
+  boundary := CalcBoundary(PostContainer);
+  RHeaders.ContentType := RHeaders.ContentType + '; boundary=' + boundary;
+  with PostContainer do begin
+    for i := 0 to High(RFormFields) do begin
+      Result := Format('%s--%s'#10'Content-Disposition: form-data; name="%s"'#10'Content-Type: text/plain' +
+        #10'Content-Transfer-Encoding: quoted-printable'#10#10'%s'#10, [Result, boundary, RFormFields[i].Name,
+        RFormFields[i].Value]);
+    end;
+    for i := 0 to High(RFiles) do begin
+      Result := Format('%s--%s'#10'Content-Disposition: form-data; name="%s"; filename="%s"'#10'Content-Type: %s' +
+        #10'Content-Transfer-Encoding: binary'#10#10, [Result, boundary, RFiles[i].Name, RFiles[i].FileName,
+        RFiles[i].ContentType]);
+      ms := TMemoryStream.Create;
+      try
+        ms.LoadFromFile(RFiles[i].FileName);
+        ss := TStringStream.Create('');
+        try
+          ss.CopyFrom(ms, ms.size);
+          Result := Result + ss.DataString + #10;
+        finally
+          ss.Free;
+        end;
+      finally
+        ms.Free;
+      end;
+    end;
+  end;
+  Result := Result + '--' + boundary + '--'#10#0;
+end;
+
 procedure THTTPSender.Get(URL: String; Stream: TStream);
-var
-  Host, Resource, ExtraInfo: string;
 begin
-  // URL := URLEncode(URL);
-  RResponseText := '';
-  ParseURL(URL, Host, Resource, ExtraInfo);
-  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'GET', Stream)
-  else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
+  PreURLExecute(URL, '', hmGet, Stream);
 end;
 
-function THTTPSender.Get(URL: String): string;
-var
-  StringStream: TStringStream;
+function THTTPSender.Get(URL: String): String;
 begin
-  Result := '';
-  StringStream := TStringStream.Create('', DefaultEncoding);
-  try
-    Get(URL, StringStream);
-    if StringStream.size > 0 then begin
-      StringStream.Seek(0, 0);
-      Result := StringStream.ReadString(StringStream.size);
-      RResponseText := Result;
-    end;
-  finally
-    StringStream.Free;
-  end;
+  Result := PreURLExecute(URL, '', hmGet);
 end;
 
-function THTTPSender.Post(URL: String; PostData: AnsiString): string;
-var
-  StringStream: TStringStream;
+function THTTPSender.Post(URL: String; PostData: ansistring): String;
 begin
-  Result := '';
-  StringStream := TStringStream.Create('', DefaultEncoding);
-  try
-    Post(URL, PostData, StringStream);
-    if StringStream.size > 0 then begin
-      StringStream.Seek(0, 0);
-      Result := StringStream.ReadString(StringStream.size);
-      RResponseText := Result;
-    end;
-  finally
-    StringStream.Free;
-  end;
+  Result := PreURLExecute(URL, PostData, hmPost);
 end;
 
-procedure THTTPSender.Post(URL: String; PostData: AnsiString; Stream: TStream);
-var
-  Host, Resource, ExtraInfo: string;
+procedure THTTPSender.Post(URL: String; PostData: ansistring; Stream: TStream);
 begin
-  RResponseText := '';
-  // URL := URLEncode(URL);
-  ParseURL(URL, Host, Resource, ExtraInfo);
-  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'POST', Stream, PostData)
-  else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
+  if RHeaders.ContentType = '' then RHeaders.ContentType := 'application/x-www-form-urlencoded';
+  PreURLExecute(URL, PostData, hmPost, Stream);
 end;
 
-function THTTPSender.Put(URL: String): string;
-var
-  StringStream: TStringStream;
+function THTTPSender.Post(URL: String; PostContainer: THTTPPostContainer): String;
 begin
-  Result := '';
-  StringStream := TStringStream.Create('', DefaultEncoding);
-  try
-    Put(URL, StringStream);
-    if StringStream.size > 0 then begin
-      StringStream.Seek(0, 0);
-      Result := StringStream.ReadString(StringStream.size);
-      RResponseText := Result;
-    end;
-  finally
-    StringStream.Free;
-  end;
+  if RHeaders.ContentType = '' then RHeaders.ContentType := 'multipart/form-data';
+  Result := PreURLExecute(URL, GetPostDataFromPostContainer(PostContainer), hmPost);
+end;
+
+procedure THTTPSender.Post(URL: String; PostContainer: THTTPPostContainer; Stream: TStream);
+begin
+  if RHeaders.ContentType = '' then RHeaders.ContentType := 'multipart/form-data';
+  PreURLExecute(URL, GetPostDataFromPostContainer(PostContainer), hmPost, Stream);
+end;
+
+function THTTPSender.Put(URL: String): String;
+begin
+  Result := PreURLExecute(URL, '', hmPut);
 end;
 
 procedure THTTPSender.Put(URL: String; Stream: TStream);
-var
-  Host, Resource, ExtraInfo: string;
 begin
-  RResponseText := '';
-  // URL := URLEncode(URL);
-  ParseURL(URL, Host, Resource, ExtraInfo);
-  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, 'PUT', Stream)
-  else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
+  PreURLExecute(URL, '', hmPut, Stream);
 end;
 
-function Pars(const source, left, right: string): string;
+function Pars(const source, left, right: String): String;
 var
   r, l: Integer;
 begin
@@ -555,23 +602,56 @@ begin
   Result := Copy(source, l + Length(left), r - l - 1);
 end;
 
-procedure THTTPSender.ProcessCookies(Data: string);
+procedure THTTPSender.PreURLExecute(URL: String; PostData: ansistring; Method: THTTPMethod; Stream: TStream);
+var
+  Host, Resource, ExtraInfo: String;
+begin
+  RResponseText := '';
+  ParseURL(URL, Host, Resource, ExtraInfo);
+  if Pos('http', URL) = 1 then URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, Method, Stream)
+  else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
+end;
+
+function THTTPSender.PreURLExecute(URL: String; PostData: ansistring; Method: THTTPMethod): string;
+var
+  StringStream: TStringStream;
+  Host, Resource, ExtraInfo: String;
+begin
+  Result := '';
+  RResponseText := '';
+  ParseURL(URL, Host, Resource, ExtraInfo);
+  StringStream := TStringStream.Create('', DefaultEncoding);
+  try
+    if Pos('http', URL) = 1 then
+        URLExecute((Pos('https', URL) = 1), Host, Resource, ExtraInfo, Method, StringStream, PostData)
+    else raise Exception.Create(Format('Unknown Protocol %s', [URL]));
+    if StringStream.size > 0 then begin
+      StringStream.Seek(0, 0);
+      Result := StringStream.ReadString(StringStream.size);
+      RResponseText := Result;
+    end;
+  finally
+    StringStream.Free;
+  end;
+end;
+
+procedure THTTPSender.ProcessCookies(Data: String);
 const
   SetCookie = 'Set-Cookie:';
 var
   NCookie: THTTPCookie;
 
-  function GetCookie(S: string): THTTPCookie;
+  function GetCookie(s: String): THTTPCookie;
   var
-    t: string;
+    t: String;
   begin
     with Result do begin
-      FName := Copy(S, 1, Pos('=', S) - 1);
-      FValue := Pars(S, '=', ';');
-      FPath := Pars(S, 'path=', ';');
-      FExpires := Pars(S, 'expires=', ';');
-      FDomain := Pars(S, 'domain=', ';');
-      FHTTPOnly := (Pos('; HttpOnly', S) > 0);
+      Name := Copy(s, 1, Pos('=', s) - 1);
+      Value := Pars(s, '=', ';');
+      Path := Pars(s, 'path=', ';');
+      Expires := Pars(s, 'expires=', ';');
+      Domain := Pars(s, 'domain=', ';');
+      HTTPOnly := (Pos('; HttpOnly', s) > 0);
     end;
   end;
 
@@ -592,7 +672,7 @@ var
 begin
   Result := -1;
   for i := 0 to High(Cookies) do
-    if (Cookies[i].FDomain = Cookie.FDomain) and (Cookies[i].FName = Cookie.FName) then begin
+    if (Cookies[i].Domain = Cookie.Domain) and (Cookies[i].Name = Cookie.Name) then begin
       Cookies[i] := Cookie;
       exit(i);
     end;
@@ -632,18 +712,18 @@ begin
   Result := Cookies[Index];
 end;
 
-function THTTPCookieCollection.GetCookies(Domain, Path: string): string;
+function THTTPCookieCollection.GetCookies(ADomain, APath: String): String;
 var
   i: Integer;
 begin
-  for i := Length(Path) downto 1 do
-    if (Path[i] = '/') and (i > 1) then begin
-      Path := Copy(Path, 1, i);
+  for i := Length(APath) downto 1 do
+    if (APath[i] = '/') and (i > 1) then begin
+      APath := Copy(APath, 1, i);
       break;
     end;
   Result := 'Cookies:';
   for i := 0 to High(Cookies) do
-    if Cookies[i].FDomain = Domain then Result := Format('%s %s=%s;', [Result, Cookies[i].FName, Cookies[i].FValue]);
+    if Cookies[i].Domain = ADomain then Result := Format('%s %s=%s;', [Result, Cookies[i].Name, Cookies[i].Value]);
   Result := Result + ' ' + RCustomCookies.Text;
   if Result[Length(Result) - 1] = ';' then Delete(Result, Length(Result) - 1, 2);
   if Length(Result) = 7 then Result := '';
@@ -665,6 +745,84 @@ constructor THTTPHeaders.Create;
 begin
   inherited;
   RCustomHeaders := TStringList.Create;
+end;
+
+{ THTTPPostContainer }
+
+procedure THTTPPostContainer.AddFile(AName, AFileName: ansistring;
+  AContentType: ansistring = 'application/octet-stream');
+begin
+  SetLength(RFiles, Length(RFiles) + 1);
+  with RFiles[High(RFiles)] do begin
+    Name := AName;
+    FileName := AFileName;
+    ContentType := AContentType;
+  end;
+end;
+
+procedure THTTPPostContainer.AddFormField(AName, AValue: ansistring);
+begin
+  SetLength(RFormFields, Length(RFormFields) + 1);
+  with RFormFields[High(RFormFields)] do begin
+    Name := AName;
+    Value := AValue;
+  end;
+end;
+
+procedure THTTPPostContainer.ClearFiles;
+begin
+  SetLength(RFiles, 0);
+end;
+
+procedure THTTPPostContainer.ClearFormFields;
+begin
+  SetLength(RFormFields, 0);
+end;
+
+procedure THTTPPostContainer.DeleteFile(Index: Integer);
+var
+  i: Integer;
+begin
+  for i := Index to High(RFiles) - 1 do RFiles[i] := RFiles[i + 1];
+  SetLength(RFiles, Length(RFiles) - 1);
+end;
+
+procedure THTTPPostContainer.DeleteFormField(Index: Integer);
+var
+  i: Integer;
+begin
+  for i := Index to High(RFormFields) - 1 do RFormFields[i] := RFormFields[i + 1];
+  SetLength(RFormFields, Length(RFormFields) - 1);
+end;
+
+function THTTPPostContainer.GetFile(Index: Integer): THTTPPostContainerFile;
+begin
+  Result := RFiles[Index];
+end;
+
+function THTTPPostContainer.GetFilesCount: Integer;
+begin
+  Result := Length(RFiles);
+end;
+
+function THTTPPostContainer.GetFormField(Index: Integer): THTTPPostContainerFormField;
+begin
+  Result := RFormFields[Index];
+end;
+
+function THTTPPostContainer.GetFormFieldsCount: Integer;
+begin
+  Result := Length(RFormFields);
+end;
+
+procedure THTTPPostContainer.SetFile(Index: Integer; Item: THTTPPostContainerFile);
+begin
+  RFiles[Index] := Item;
+end;
+
+procedure THTTPPostContainer.SetFormField(Index: Integer; Item: THTTPPostContainerFormField);
+begin
+  RFormFields[Index] := Item;
 end;
 
 end.

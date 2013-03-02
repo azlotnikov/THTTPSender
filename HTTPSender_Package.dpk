@@ -1,4 +1,4 @@
-package HTTPSender_XE2;
+package HTTPSender_Package;
 
 {$R *.res}
 {$R *.dres}

@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899.12.30 00:00:00.000.269,D:\ProjectsGit\THTTPSender\HTTPSender.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.483,=D:\ProjectsGit\THTTPSender\THTTPSender.rc</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.752,=D:\ProjectsGit\THTTPSender\HTTPSender.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.003,D:\ProjectsGit\THTTPSender\D_XE2.dproj=D:\ProjectsGit\THTTPSender\HTTPSender_XE2.dproj</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.617,=D:\ProjectsGit\THTTPSender\HTTPSender.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.529,=rtl.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.664,=D:\ProjectsGit\THTTPSender\THTTPSender.bmp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.109,D:\ProjectsGit\THTTPSender\THTTPSender.rc=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.002,C:\Users\root\Documents\RAD Studio\Projects\Package1.dproj=D:\ProjectsGit\THTTPSender\D_XE2.dproj</Transaction>
+    <Transaction>2013.03.02 22:41:13.018,D:\ProjectsGit\THTTPSender\HTTPSender_Package.dproj=D:\ProjectsGit\THTTPSender\HTTPSender_XE2.dproj</Transaction>
+  </Transactions>
+</BorlandProject>
