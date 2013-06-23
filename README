@@ -11,3 +11,4 @@ THTTPSender - легкая замена idHTTP + idCookieManager + TIdSSLIOHandlerSocketOpen
 + Basic Auth
 + Read, Connect, Send Timeouts
 + События OnWork, OnWorkBegin, OnWorkEnd аналогичные таким же событиям в IdHTTP
++ THTTPContainer для отправки файлов ( аналог TIdMultipartFormDataStream )
