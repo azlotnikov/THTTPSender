@@ -518,7 +518,8 @@ function THTTPSender.GetRandomBoundary: ansistring;
 var
   i: Integer;
 begin
-  for i := 2 to 15 do Result := Format('----------0%s%d', [Result, random(10)]);
+  Result := '----------0';
+  for i := 2 to 15 do Result := Format('%s%d', [Result, random(10)]);
 end;
 
 constructor THTTPSender.Create(AOwner: TComponent);
